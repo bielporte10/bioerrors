@@ -1,24 +1,29 @@
 """
-Publica el catàleg també com a HTML estàtic dins d'index.html.
+Genera tot el que fa que el catàleg es pugui trobar buscant.
 
-Per què cal. Tot el catàleg viu dins del `<script>`: el 2026-09-05 el HTML
-visible de la pàgina eren 2.053 caràcters i el JavaScript 40.552. Cap signatura
-d'error — `bash\\r`, `NegativeArraySizeException`, `.vmoptions`, `-Xmx` — existia
-com a text llegible, i només apareixia després que algú enganxés un error i
-cliqués un botó.
+El problema que resol. El 2026-09-05 el catàleg sencer vivia dins del
+`<script>`: 2.053 caràcters de HTML visible contra 40.552 de JavaScript. Cap
+signatura d'error existia com a text llegible. Qui googleja el seu error no
+podia arribar aquí, que és exactament el canal amb què es va justificar el
+projecte.
 
-Això vol dir que **qui googleja el seu error exacte no pot arribar mai aquí**,
-que és precisament el canal amb què es va justificar el projecte: la gent ja
-enganxa errors de bioinformàtica a Google. La caixa interactiva es queda; a
-sota s'hi afegeix el catàleg sencer en HTML pla, que és el que un cercador pot
-indexar i el que algú pot llegir sense haver d'enganxar res.
+La primera versió d'aquest script ho va arreglar a mitges: va publicar les 44
+fitxes en una sola pàgina. Però **una pàgina no pot posicionar per 44 errors
+diferents**. Competint alhora per "NegativeArraySizeException", "bash\\r: No
+such file or directory" i "sort: invalid option -- '@'", no surt bé per cap.
 
-Cada entrada té àncora pròpia (`#s-...`), per poder enllaçar una fitxa concreta
-des d'una resposta a Biostars.
+Per això ara genera tres coses:
 
-La font de veritat segueix sent l'array CATALOGUE del JavaScript. Aquest script
-el llegeix i regenera el bloc estàtic entre dues marques, o sigui que es pot
-tornar a executar tantes vegades com calgui.
+  e/<error>.html   una pàgina per signatura, amb títol i descripció propis.
+                   És la que ha de sortir quan algú busca aquell error concret.
+  index.html       la portada passa a ser un índex: etiqueta, una línia i
+                   enllaç. Sense duplicar el text de les fitxes, que a Google
+                   li compta com a contingut repetit.
+  sitemap.xml      les 45 pàgines, per enviar-lo a Search Console.
+  robots.txt       obert i apuntant al sitemap.
+
+La font de veritat segueix sent l'array CATALOGUE del JavaScript d'index.html.
+Tot això se'n deriva, i es pot tornar a executar tantes vegades com calgui.
 
 Us:
     python estatic.py
@@ -28,6 +33,7 @@ import html
 import re
 import sys
 import unicodedata
+from datetime import date
 from pathlib import Path
 
 for _stream in (sys.stdout, sys.stderr):
@@ -38,6 +44,8 @@ for _stream in (sys.stdout, sys.stderr):
 
 AQUI = Path(__file__).parent
 PAGINA = AQUI / "index.html"
+FITXES = AQUI / "e"
+BASE = "https://bielporte10.github.io/bioerrors/"
 INICI = "<!-- CATALEG-ESTATIC:INICI -->"
 FI = "<!-- CATALEG-ESTATIC:FI -->"
 
@@ -52,12 +60,13 @@ AREES = {
 }
 
 
+# ------------------------------------------------------------------- lectura
+
 def llegeix_catalog(text):
     """Treu les entrades de l'array CATALOGUE del JavaScript.
 
-    No fa servir un parser de JSON perquè això no és JSON: hi ha expressions
-    regulars a `sig:`. N'hi ha prou amb llegir els camps de text, que són els
-    únics que es publiquen.
+    No és JSON: hi ha expressions regulars a `sig:`. N'hi ha prou amb llegir
+    els camps de text, que són els únics que es publiquen.
     """
     inici = text.index("var CATALOGUE = [")
     fi = text.index("\n  ];", inici)
@@ -73,51 +82,138 @@ def llegeix_catalog(text):
     return entrades
 
 
-def ancora(etiqueta):
+def clau(etiqueta):
     net = unicodedata.normalize("NFKD", etiqueta).encode("ascii", "ignore").decode()
     net = re.sub(r"[^a-zA-Z0-9]+", "-", net).strip("-").lower()
-    return "s-" + (net[:60] or "entrada")
+    return net[:60] or "entrada"
 
 
-def fitxa(e):
-    return (
-        f'<article class="entry" id="{ancora(e.get("label", e["title"]))}">\n'
-        f'  <h3>{html.escape(e.get("label", ""))}</h3>\n'
-        f'  <p class="what">{e["title"]}</p>\n'
-        f'  <dl><dt>why</dt><dd>{e.get("cause", "")}</dd>\n'
-        f'  <dt>next</dt><dd>{e.get("fix", "")}</dd></dl>\n'
-        f'  <div class="src">{html.escape(e.get("src", ""))}</div>\n'
-        f'</article>'
-    )
+def sense_html(t):
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", t)).strip()
 
 
-def construeix(entrades):
+def tipografies(text):
+    """Els mateixos <link> de font que la portada, perquè les fitxes no es
+    vegin d'una altra web."""
+    cap = text[text.index("<head"):text.index("</head>")]
+    trobats = re.findall(r'<link[^>]*fonts\.(?:googleapis|gstatic)[^>]*>', cap)
+    return "\n".join(trobats)
+
+
+def paleta(text):
+    """Reaprofita els colors i les tipografies de la portada, perquè les
+    fitxes no semblin d'una altra web."""
+    m = re.search(r":root\{[^}]*\}", text)
+    return m.group(0) if m else ":root{--ink:#111;--ink-faint:#666;--line:#ddd;}"
+
+
+# --------------------------------------------------------- pàgines per fitxa
+
+CSS_FITXA = """
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  font-size:16px;line-height:1.6;}
+.wrap{max-width:720px;margin:0 auto;padding:40px 20px 80px;}
+nav{font-size:13px;color:var(--ink-faint);margin-bottom:28px;}
+nav a{color:var(--ink-faint);}
+h1{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:20px;line-height:1.35;margin:0 0 10px;word-break:break-word;}
+.what{font-size:18px;font-weight:600;margin:0 0 28px;}
+h2{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);
+  margin:26px 0 6px;}
+p{margin:0 0 14px;}
+code{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:.9em;background:#f4f4f2;padding:1px 4px;border-radius:3px;
+  word-break:break-word;}
+.src{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;
+  color:var(--ink-faint);margin-top:26px;padding-top:14px;
+  border-top:1px solid var(--line);}
+.back{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);
+  font-size:14px;}
+.back a{color:var(--ink);}
+"""
+
+
+def pagina_fitxa(e, arrel_css, fonts):
+    etiqueta = e.get("label", "")
+    titol_pla = sense_html(e["title"])
+    desc = html.escape(titol_pla[:180], quote=True)
+    url = BASE + "e/" + clau(etiqueta) + ".html"
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{html.escape(etiqueta)} — what it actually means</title>
+<meta name="description" content="{desc}">
+<link rel="canonical" href="{url}">
+{fonts}
+<style>{arrel_css}{CSS_FITXA}</style>
+</head>
+<body>
+<div class="wrap">
+  <nav><a href="../index.html">BioErrors</a> / {html.escape(AREES.get(e.get("cat", ""), e.get("cat", "")))}</nav>
+  <h1>{html.escape(etiqueta)}</h1>
+  <p class="what">{e["title"]}</p>
+  <h2>why</h2>
+  <p>{e.get("cause", "")}</p>
+  <h2>what to do</h2>
+  <p>{e.get("fix", "")}</p>
+  <div class="src">{html.escape(e.get("src", ""))}</div>
+  <div class="back">
+    This is one entry from <a href="../index.html">BioErrors</a>, a catalogue of
+    bioinformatics error messages that point at the wrong thing. Every entry was
+    traced to its real cause before it was written down.<br>
+    If your error is not in it, <a href="../index.html">paste it there</a> and it
+    gets traced and added.
+  </div>
+</div>
+</body>
+</html>
+"""
+
+
+# ----------------------------------------------------------- índex i sitemap
+
+def bloc_index(entrades):
+    """La portada llista, no repeteix.
+
+    Si la portada porta el text sencer de cada fitxa i la fitxa també, Google
+    ho llegeix com a contingut duplicat i decideix ell quina ensenyar. Aquí la
+    portada dona etiqueta, una línia i enllaç; el text sencer viu a la fitxa.
+    """
     per_area = {}
     for e in entrades:
         per_area.setdefault(e.get("cat", "altres"), []).append(e)
 
     seccions = []
-    for clau, llista in sorted(per_area.items(), key=lambda x: -len(x[1])):
-        titol = AREES.get(clau, clau.title())
+    for c, llista in sorted(per_area.items(), key=lambda x: -len(x[1])):
+        files = "\n".join(
+            f'<li><a href="e/{clau(x.get("label",""))}.html">'
+            f'<code>{html.escape(x.get("label",""))}</code></a> '
+            f'<span>{html.escape(sense_html(x["title"]))}</span></li>'
+            for x in llista
+        )
         seccions.append(
-            f'<h3 class="area">{html.escape(titol)} '
-            f'<span>{len(llista)}</span></h3>\n'
-            + "\n".join(fitxa(e) for e in llista)
+            f'<h3 class="area">{html.escape(AREES.get(c, c.title()))} '
+            f'<span>{len(llista)}</span></h3>\n<ul class="idx">\n{files}\n</ul>'
         )
 
     return (
-        f'{INICI}\n'
-        f'<section id="catalogue">\n'
+        f'{INICI}\n<section id="catalogue">\n'
         f'<h2>The full catalogue — {len(entrades)} signatures</h2>\n'
-        f'<p class="lede">Every entry, as plain text, so you can read the whole '
-        f'thing without pasting anything — and so it can be found by searching '
-        f'for the error itself. Each one says where the diagnosis came from.</p>\n'
+        f'<p class="lede">Every signature in the catalogue, so you can read the '
+        f'list without pasting anything. Each one opens the entry, with the cause '
+        f'and where the diagnosis came from.</p>\n'
         + "\n".join(seccions)
         + f'\n</section>\n{FI}'
     )
 
 
-CSS = """
+CSS_INDEX = """
   #catalogue{margin-top:52px;border-top:1px solid var(--line);padding-top:28px;}
   #catalogue h2{font-size:19px;margin:0 0 8px;}
   #catalogue .lede{color:var(--ink-faint);margin:0 0 26px;max-width:62ch;}
@@ -125,18 +221,26 @@ CSS = """
     letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);
     margin:34px 0 12px;border-bottom:1px solid var(--line);padding-bottom:6px;}
   #catalogue h3.area span{float:right;}
-  #catalogue .entry{margin:0 0 22px;}
-  #catalogue .entry h3{font-family:"IBM Plex Mono",monospace;font-size:13px;
-    margin:0 0 4px;word-break:break-word;}
-  #catalogue .entry .what{margin:0 0 8px;font-weight:600;}
-  #catalogue .entry dl{margin:0;}
-  #catalogue .entry dt{font-family:"IBM Plex Mono",monospace;font-size:11px;
-    letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-top:6px;}
-  #catalogue .entry dd{margin:2px 0 0;}
-  #catalogue .entry .src{font-family:"IBM Plex Mono",monospace;font-size:11px;
-    color:var(--ink-faint);margin-top:8px;}
+  #catalogue ul.idx{list-style:none;margin:0;padding:0;}
+  #catalogue ul.idx li{margin:0 0 12px;}
+  #catalogue ul.idx code{font-size:13px;word-break:break-word;}
+  #catalogue ul.idx span{display:block;color:var(--ink-faint);font-size:14px;}
 """
 
+
+def sitemap(entrades):
+    avui = date.today().isoformat()
+    urls = [BASE] + [BASE + "e/" + clau(e.get("label", "")) + ".html"
+                     for e in entrades]
+    cos = "\n".join(
+        f"  <url><loc>{u}</loc><lastmod>{avui}</lastmod></url>" for u in urls
+    )
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            f"{cos}\n</urlset>\n")
+
+
+# --------------------------------------------------------------------- main
 
 def main():
     text = PAGINA.read_text(encoding="utf-8")
@@ -144,23 +248,54 @@ def main():
     if not entrades:
         sys.exit("No he sabut llegir cap entrada del CATALOGUE.")
 
-    bloc = construeix(entrades)
+    claus = [clau(e.get("label", "")) for e in entrades]
+    duplicats = {k for k in claus if claus.count(k) > 1}
+    if duplicats:
+        sys.exit(f"Adreces repetides, dues fitxes escriurien el mateix fitxer: "
+                 f"{sorted(duplicats)}")
 
+    arrel_css = paleta(text)
+    fonts = tipografies(text)
+
+    # No s'esborra la carpeta sencera: a Windows falla si algú la té oberta,
+    # i a sobre no cal. S'escriuen les que toquen i es treuen només les que
+    # han desaparegut del catàleg, perquè no quedin pàgines penjades.
+    FITXES.mkdir(exist_ok=True)
+    vigents = set()
+    for e in entrades:
+        nom = clau(e.get("label", "")) + ".html"
+        vigents.add(nom)
+        (FITXES / nom).write_text(
+            pagina_fitxa(e, arrel_css, fonts), encoding="utf-8"
+        )
+    for antic in FITXES.glob("*.html"):
+        if antic.name not in vigents:
+            antic.unlink()
+            print(f"   retirada: e/{antic.name}")
+
+    bloc = bloc_index(entrades)
     if INICI in text and FI in text:
-        text = re.sub(re.escape(INICI) + ".*?" + re.escape(FI), lambda _: bloc,
-                      text, flags=re.S)
+        text = re.sub(re.escape(INICI) + ".*?" + re.escape(FI),
+                      lambda _: bloc, text, flags=re.S)
     else:
         text = text.replace("  <footer>", bloc + "\n\n  <footer>", 1)
 
+    text = re.sub(r"\n  #catalogue\{.*?color:var\(--ink-faint\);margin-top:8px;\}\n",
+                  "\n", text, flags=re.S)
     if "#catalogue{" not in text:
-        text = text.replace("  footer{font-family:", CSS + "  footer{font-family:", 1)
+        text = text.replace("  footer{font-family:",
+                            CSS_INDEX + "  footer{font-family:", 1)
 
     PAGINA.write_text(text, encoding="utf-8")
+    (AQUI / "sitemap.xml").write_text(sitemap(entrades), encoding="utf-8")
+    (AQUI / "robots.txt").write_text(
+        f"User-agent: *\nAllow: /\n\nSitemap: {BASE}sitemap.xml\n", encoding="utf-8"
+    )
 
     visible = text[text.index("<body"):text.index("<script>")]
-    print(f">> {len(entrades)} entrades publicades com a HTML estàtic")
-    print(f"   HTML visible: {len(visible):,} caràcters "
-          f"(abans de fer-ho eren ~2.053)")
+    print(f">> {len(entrades)} fitxes a e/, sitemap i robots escrits")
+    print(f"   portada: índex enllaçat, {len(visible):,} caràcters visibles")
+    print(f"   sitemap: {len(entrades) + 1} adreces")
 
 
 if __name__ == "__main__":

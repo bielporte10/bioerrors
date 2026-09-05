@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AmbiguousRuleException — what it actually means</title>
+<meta name="description" content="Two rules can both produce the same file and Snakemake will not guess">
+<link rel="canonical" href="https://bielporte10.github.io/bioerrors/e/ambiguousruleexception.html">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>:root{
+    --paper:#F6F8F6; --surface:#FFFFFF; --surface-2:#EEF3F0;
+    --ink:#161F1B; --ink-muted:#5C6B62; --ink-faint:#8A968F; --line:#DCE4DE;
+    --accent:#237265; --accent-ink:#0E4038; --accent-soft:#E3F1EC;
+    --warn:#A6501C; --warn-soft:#F6E9DF;
+    --shadow: 0 1px 2px rgba(20,30,25,.04), 0 8px 24px -12px rgba(20,30,25,.18);
+    color-scheme: light;
+  }
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  font-size:16px;line-height:1.6;}
+.wrap{max-width:720px;margin:0 auto;padding:40px 20px 80px;}
+nav{font-size:13px;color:var(--ink-faint);margin-bottom:28px;}
+nav a{color:var(--ink-faint);}
+h1{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:20px;line-height:1.35;margin:0 0 10px;word-break:break-word;}
+.what{font-size:18px;font-weight:600;margin:0 0 28px;}
+h2{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);
+  margin:26px 0 6px;}
+p{margin:0 0 14px;}
+code{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:.9em;background:#f4f4f2;padding:1px 4px;border-radius:3px;
+  word-break:break-word;}
+.src{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;
+  color:var(--ink-faint);margin-top:26px;padding-top:14px;
+  border-top:1px solid var(--line);}
+.back{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);
+  font-size:14px;}
+.back a{color:var(--ink);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav><a href="../index.html">BioErrors</a> / Snakemake</nav>
+  <h1>AmbiguousRuleException</h1>
+  <p class="what">Two rules can both produce the same file and Snakemake will not guess</p>
+  <h2>why</h2>
+  <p>Wildcard patterns in two rules overlap, so more than one rule could legitimately create the requested output. Snakemake refuses to pick, because picking wrong would silently produce the wrong result.</p>
+  <h2>what to do</h2>
+  <p>Make the patterns non-overlapping — usually by tightening a wildcard with a constraint (<code>wildcard_constraints</code>) or by putting each rule's output in its own directory. <code>ruleorder:</code> resolves it too, but it hides the ambiguity rather than fixing it.</p>
+  <div class="src">Snakemake documented behaviour</div>
+  <div class="back">
+    This is one entry from <a href="../index.html">BioErrors</a>, a catalogue of
+    bioinformatics error messages that point at the wrong thing. Every entry was
+    traced to its real cause before it was written down.<br>
+    If your error is not in it, <a href="../index.html">paste it there</a> and it
+    gets traced and added.
+  </div>
+</div>
+</body>
+</html>

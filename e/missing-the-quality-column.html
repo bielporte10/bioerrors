@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>missing the QUALITY-column — what it actually means</title>
+<meta name="description" content="fasterq-dump is reading something that is not a real run accession">
+<link rel="canonical" href="https://bielporte10.github.io/bioerrors/e/missing-the-quality-column.html">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>:root{
+    --paper:#F6F8F6; --surface:#FFFFFF; --surface-2:#EEF3F0;
+    --ink:#161F1B; --ink-muted:#5C6B62; --ink-faint:#8A968F; --line:#DCE4DE;
+    --accent:#237265; --accent-ink:#0E4038; --accent-soft:#E3F1EC;
+    --warn:#A6501C; --warn-soft:#F6E9DF;
+    --shadow: 0 1px 2px rgba(20,30,25,.04), 0 8px 24px -12px rgba(20,30,25,.18);
+    color-scheme: light;
+  }
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  font-size:16px;line-height:1.6;}
+.wrap{max-width:720px;margin:0 auto;padding:40px 20px 80px;}
+nav{font-size:13px;color:var(--ink-faint);margin-bottom:28px;}
+nav a{color:var(--ink-faint);}
+h1{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:20px;line-height:1.35;margin:0 0 10px;word-break:break-word;}
+.what{font-size:18px;font-weight:600;margin:0 0 28px;}
+h2{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);
+  margin:26px 0 6px;}
+p{margin:0 0 14px;}
+code{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:.9em;background:#f4f4f2;padding:1px 4px;border-radius:3px;
+  word-break:break-word;}
+.src{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;
+  color:var(--ink-faint);margin-top:26px;padding-top:14px;
+  border-top:1px solid var(--line);}
+.back{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);
+  font-size:14px;}
+.back a{color:var(--ink);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav><a href="../index.html">BioErrors</a> / Files and formats</nav>
+  <h1>missing the QUALITY-column</h1>
+  <p class="what">fasterq-dump is reading something that is not a real run accession</p>
+  <h2>why</h2>
+  <p>This appears when the thing being dumped is not a valid run: a BioProject ID (<code>PRJNA…</code>), a filename, or leftover partial data cached under one of those names by an earlier failed attempt. <strong>If two different inputs give the identical error, it is almost certainly stale cache</strong> being reused rather than a real resolution.</p>
+  <h2>what to do</h2>
+  <p>Clear what got cached under those names (look in <code>~/ncbi/public/sra/</code>, or wherever <code>vdb-config</code> points), then loop over real run accessions one at a time — <code>prefetch</code> and <code>fasterq-dump</code> take one accession per call, not a text file of them.</p>
+  <div class="src">traced · SRA toolkit case, Sep 2026</div>
+  <div class="back">
+    This is one entry from <a href="../index.html">BioErrors</a>, a catalogue of
+    bioinformatics error messages that point at the wrong thing. Every entry was
+    traced to its real cause before it was written down.<br>
+    If your error is not in it, <a href="../index.html">paste it there</a> and it
+    gets traced and added.
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://bielporte10.github.io/bioerrors/sitemap.xml
