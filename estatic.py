@@ -42,10 +42,13 @@ INICI = "<!-- CATALEG-ESTATIC:INICI -->"
 FI = "<!-- CATALEG-ESTATIC:FI -->"
 
 AREES = {
-    "nextflow": "Nextflow", "snakemake": "Snakemake", "conda": "conda i entorns",
-    "docker": "Contenidors", "file": "Fitxers i formats", "r": "R i Bioconductor",
-    "java": "Java", "python": "Python", "cluster": "HPC i cues",
-    "shell": "Shell", "perl": "Perl",
+    # La pagina es en angles: aquests titols hi surten, no son comentaris.
+    "nextflow": "Nextflow", "snakemake": "Snakemake",
+    "conda": "conda and environments", "docker": "Containers",
+    "data": "Files and formats", "r": "R and Bioconductor",
+    "java": "Java", "python": "Python", "cluster": "HPC and schedulers",
+    "shell": "Shell", "align": "Aligners", "net": "Network and downloads",
+    "perl": "Perl",
 }
 
 
