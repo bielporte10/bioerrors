@@ -15,7 +15,7 @@
   img{max-width:100%;}
   [hidden]{display:none !important;}
 </style>
-<title>BioErrors</title>
+<title>BioErrors — what bioinformatics error messages actually mean</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
@@ -100,6 +100,24 @@
     border:1px solid var(--ink);border-radius:4px;padding:6px 12px;text-decoration:none;}
   .nomatch a.report:hover{background:var(--ink);color:#fff;}
   .reportnote{display:block;margin-top:8px;font-size:12px;color:var(--ink-faint);}
+
+  #catalogue{margin-top:52px;border-top:1px solid var(--line);padding-top:28px;}
+  #catalogue h2{font-size:19px;margin:0 0 8px;}
+  #catalogue .lede{color:var(--ink-faint);margin:0 0 26px;max-width:62ch;}
+  #catalogue h3.area{font-family:"IBM Plex Mono",monospace;font-size:12px;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);
+    margin:34px 0 12px;border-bottom:1px solid var(--line);padding-bottom:6px;}
+  #catalogue h3.area span{float:right;}
+  #catalogue .entry{margin:0 0 22px;}
+  #catalogue .entry h3{font-family:"IBM Plex Mono",monospace;font-size:13px;
+    margin:0 0 4px;word-break:break-word;}
+  #catalogue .entry .what{margin:0 0 8px;font-weight:600;}
+  #catalogue .entry dl{margin:0;}
+  #catalogue .entry dt{font-family:"IBM Plex Mono",monospace;font-size:11px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-top:6px;}
+  #catalogue .entry dd{margin:2px 0 0;}
+  #catalogue .entry .src{font-family:"IBM Plex Mono",monospace;font-size:11px;
+    color:var(--ink-faint);margin-top:8px;}
   footer{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-faint);border-top:1px solid var(--line);padding-top:18px;line-height:1.7;}
 </style>
 
@@ -145,6 +163,319 @@
     <h2 class="section-title">what's in the catalogue</h2>
     <div id="catalogueList"></div>
   </section>
+
+<!-- CATALEG-ESTATIC:INICI -->
+<section id="catalogue">
+<h2>The full catalogue — 42 signatures</h2>
+<p class="lede">Every entry, as plain text, so you can read the whole thing without pasting anything — and so it can be found by searching for the error itself. Each one says where the diagnosis came from.</p>
+<h3 class="area">Nextflow <span>6</span></h3>
+<article class="entry" id="s-command-not-found-mem">
+  <h3>command not found: mem</h3>
+  <p class="what">You copied a line out of a pipeline log — that variable only exists inside the pipeline</p>
+  <dl><dt>why</dt><dd>Workflow managers set tool paths as environment variables (<code>$BWA</code>, <code>$SAMTOOLS</code>) that exist <strong>only while the workflow is running the task</strong>. Paste <code>$BWA mem …</code> into your own shell and the variable is empty, so the shell reads <code>mem</code> as the command name. This is a red herring — it tells you nothing about why the pipeline failed.</dd>
+  <dt>next</dt><dd>Ignore it and go back to the pipeline's own error. In Nextflow, open the <code>Work dir:</code> path printed just above the failure and read <code>.command.err</code> in full — the real reason is in there, usually before any long usage dump.</dd></dl>
+  <div class="src">traced · read AMR++&#x27;s params.config and bwa.nf, Sep 2026</div>
+</article>
+<article class="entry" id="s-unable-to-parse-config-file">
+  <h3>Unable to parse config file</h3>
+  <p class="what">nextflow.config has a syntax error, usually an unbalanced brace or quote</p>
+  <dl><dt>why</dt><dd>The config is Groovy, not plain key=value, so an unclosed <code>{</code>, a smart/curly quote pasted from a document, or a missing comma breaks the whole file. The reported line number is where the parser gave up, which is often <em>after</em> the real mistake.</dd>
+  <dt>next</dt><dd>Look above the reported line for the last block you edited, and check braces balance and that every quote is a plain ASCII <code>'</code> or <code>\"</code>. Bisect by commenting out blocks until it parses — that finds it faster than re-reading.</dd></dl>
+  <div class="src">Nextflow config syntax</div>
+</article>
+<article class="entry" id="s-no-such-file-or-directory-in-a-task">
+  <h3>No such file or directory (in a task)</h3>
+  <p class="what">The file exists on your machine but was never staged into the task's working directory</p>
+  <dl><dt>why</dt><dd>Each task runs in its own isolated work directory containing <strong>only the files declared as inputs</strong>. A path that works when you run the command by hand will not resolve inside the task unless the workflow staged it there. Relative paths written inside a script are resolved against that work directory, not against where you launched from.</dd>
+  <dt>next</dt><dd>Declare the file as a proper input channel rather than hardcoding its path in the script. For reference data that must stay in place, pass an absolute path via a param, and remember that on a cluster or in a container that path also has to be mounted/visible on the compute node.</dd></dl>
+  <div class="src">Nextflow / Snakemake execution model</div>
+</article>
+<article class="entry" id="s-missing-output-file-s-expected-by-process">
+  <h3>Missing output file(s) expected by process</h3>
+  <p class="what">The task ran, but nothing matched the output pattern it declared</p>
+  <dl><dt>why</dt><dd>The <code>output:</code> declaration is a promise about filenames. If the tool wrote a different name, wrote into a subdirectory, or wrote nothing because it failed quietly, the pattern matches nothing and the workflow stops here — even though the tool itself may have exited 0.</dd>
+  <dt>next</dt><dd>Go to the <code>Work dir:</code> and simply list it: what is actually there tells you immediately whether the name differs or nothing was produced. Also check <code>.command.err</code> — a tool that failed but exited 0 is common, and this is where it shows up.</dd></dl>
+  <div class="src">Nextflow output declaration</div>
+</article>
+<article class="entry" id="s-empty-channel-no-input-received">
+  <h3>empty channel / no input received</h3>
+  <p class="what">A glob matched nothing, so the process never ran at all</p>
+  <dl><dt>why</dt><dd>When a file pattern matches nothing the channel is empty and any process consuming it is simply skipped — often with no loud error. The usual culprit is quoting: an unquoted glob is expanded by your shell before the workflow ever sees it, so the workflow receives one filename instead of the pattern.</dd>
+  <dt>next</dt><dd>Always quote glob patterns on the command line: <code>--reads '*_{1,2}.fastq.gz'</code>. Then test the pattern with <code>ls</code> using the exact same quoting to confirm it matches what you expect, including the paired-end braces.</dd></dl>
+  <div class="src">Nextflow channel semantics</div>
+</article>
+<article class="entry" id="s-terminated-with-an-error-exit-status">
+  <h3>terminated with an error exit status</h3>
+  <p class="what">The workflow is relaying a tool failure — the reason is in the task's own error file</p>
+  <dl><dt>why</dt><dd>This line is the workflow manager reporting a failure, not describing it. Exit status 1 is a generic \"the program refused\", and a long usage/options dump after it is the tool saying it was called with arguments it could not accept.</dd>
+  <dt>next</dt><dd>Open the task's working directory — Nextflow prints it as <code>Work dir:</code> right below the error — and read <code>.command.err</code> <strong>in full, from the top</strong>. The specific reason is usually the first line, before any help text, and it is exactly the part most often cut off when people copy an error out.</dd></dl>
+  <div class="src">Nextflow task failure structure</div>
+</article>
+<h3 class="area">Data <span>6</span></h3>
+<article class="entry" id="s-missing-the-quality-column">
+  <h3>missing the QUALITY-column</h3>
+  <p class="what">fasterq-dump is reading something that is not a real run accession</p>
+  <dl><dt>why</dt><dd>This appears when the thing being dumped is not a valid run: a BioProject ID (<code>PRJNA…</code>), a filename, or leftover partial data cached under one of those names by an earlier failed attempt. <strong>If two different inputs give the identical error, it is almost certainly stale cache</strong> being reused rather than a real resolution.</dd>
+  <dt>next</dt><dd>Clear what got cached under those names (look in <code>~/ncbi/public/sra/</code>, or wherever <code>vdb-config</code> points), then loop over real run accessions one at a time — <code>prefetch</code> and <code>fasterq-dump</code> take one accession per call, not a text file of them.</dd></dl>
+  <div class="src">traced · SRA toolkit case, Sep 2026</div>
+</article>
+<article class="entry" id="s-is-a-local-non-kart-file">
+  <h3>is a local non-kart file</h3>
+  <p class="what">prefetch was handed a plain accession list, which it does not accept</p>
+  <dl><dt>why</dt><dd><code>prefetch</code> takes either a single accession, or a <em>kart file</em> — the \"Cart File\" download from the SRA Run Selector. The plain <code>SRR_Acc_List.txt</code> is a different format and is not read as a list.</dd>
+  <dt>next</dt><dd>Loop over it one line at a time: <code>while read acc; do prefetch \"$acc\"; fasterq-dump \"$acc\"; done &lt; SRR_Acc_List.txt</code> — and check the file's contents first, since a stray header line gets treated as an accession too.</dd></dl>
+  <div class="src">traced · SRA toolkit case, Sep 2026</div>
+</article>
+<article class="entry" id="s-chromosome-naming-mismatch-chr1-vs-1">
+  <h3>chromosome naming mismatch (chr1 vs 1)</h3>
+  <p class="what">Two files use different names for the same chromosomes</p>
+  <dl><dt>why</dt><dd>Ensembl-style references name chromosomes <code>1, 2, X</code>; UCSC-style name them <code>chr1, chr2, chrX</code>. Mixing an alignment, an annotation and a reference from different sources is the single most common source of \"no data\" and dictionary-mismatch errors — the files are individually valid but describe incompatible coordinate spaces.</dd>
+  <dt>next</dt><dd>Check the naming in each file before anything else (<code>samtools idxstats</code>, the VCF header, the first column of the GTF). Then standardise on one convention across every file in the analysis and rebuild whatever indexes depend on it. Renaming is safer than hoping a tool will map them for you.</dd></dl>
+  <div class="src">reference genome conventions</div>
+</article>
+<article class="entry" id="s-truncated-file-eof-marker-absent">
+  <h3>truncated file / EOF marker absent</h3>
+  <p class="what">The file was never finished being written</p>
+  <dl><dt>why</dt><dd>BGZF files (BAM, bgzipped VCF/FASTQ) end with a defined EOF block. Missing it means writing stopped early — a killed job, a full disk, an interrupted download, or a file read while still being written.</dd>
+  <dt>next</dt><dd>Treat the file as invalid rather than trying to repair it, and check <em>why</em> writing stopped — the job's own log usually shows a kill or an out-of-disk. If it was downloaded, verify the checksum; a truncated transfer is far more common than a corrupt source.</dd></dl>
+  <div class="src">BGZF format specification</div>
+</article>
+<article class="entry" id="s-file-not-sorted-so-coordinate">
+  <h3>file not sorted / SO:coordinate</h3>
+  <p class="what">The tool needs the file sorted in a specific order and this one is not</p>
+  <dl><dt>why</dt><dd>Most downstream tools require coordinate-sorted, indexed BAM; a few (mate-fixing, some counters) require name-sorted instead. Files come out of an aligner in neither order, and the header's <code>SO:</code> tag is what tools check.</dd>
+  <dt>next</dt><dd>Sort into the order that step actually needs — <code>samtools sort</code> for coordinate, <code>samtools sort -n</code> for name — then index if it is coordinate-sorted. Sorting twice in a pipeline is a common waste; check what each step requires before adding another sort.</dd></dl>
+  <div class="src">SAM/BAM specification</div>
+</article>
+<article class="entry" id="s-fail-to-open-file">
+  <h3>fail to open file</h3>
+  <p class="what">The path is wrong, the file is unreadable, or its index is missing</p>
+  <dl><dt>why</dt><dd>htslib reports the same message for a missing path, a permissions problem, and a file whose companion index is absent. Inside a container or on a cluster node, a path that exists for you may simply not be mounted there.</dd>
+  <dt>next</dt><dd>Check the exact path from the same context the tool runs in — inside the container, on the compute node — not from your login shell. Then confirm the index exists next to the file (<code>.bai</code>, <code>.tbi</code>, <code>.fai</code>) and is newer than the file itself.</dd></dl>
+  <div class="src">htslib error reporting</div>
+</article>
+<h3 class="area">Snakemake <span>5</span></h3>
+<article class="entry" id="s-missingoutputexception">
+  <h3>MissingOutputException</h3>
+  <p class="what">The job reported success but Snakemake could not see the files it promised</p>
+  <dl><dt>why</dt><dd>Two very different causes share this message. On a cluster or network filesystem it is usually <strong>latency</strong> — the file exists but is not visible yet when Snakemake checks. Otherwise the rule genuinely wrote something other than what its <code>output:</code> declares.</dd>
+  <dt>next</dt><dd>On a shared filesystem raise <code>--latency-wait</code> (60 is a normal value). Otherwise run that rule's command by hand and compare what appears against the <code>output:</code> block. Note that \"Removing output files of failed job\" is a consequence — <strong>the real error is above it</strong> in the log.</dd></dl>
+  <div class="src">Snakemake documented behaviour</div>
+</article>
+<article class="entry" id="s-directory-cannot-be-locked">
+  <h3>Directory cannot be locked</h3>
+  <p class="what">A previous run died without releasing its lock</p>
+  <dl><dt>why</dt><dd>Snakemake locks the working directory so two runs cannot corrupt each other's outputs. If a run is killed — Ctrl-C, a scheduler timeout, a dropped SSH session — the lock file survives it.</dd>
+  <dt>next</dt><dd>Confirm no other run is genuinely still going, then <code>snakemake --unlock</code> and start again. <strong>Only unlock when you are sure nothing else is running</strong>; unlocking a live run is how output actually gets corrupted.</dd></dl>
+  <div class="src">Snakemake documented behaviour</div>
+</article>
+<article class="entry" id="s-ambiguousruleexception">
+  <h3>AmbiguousRuleException</h3>
+  <p class="what">Two rules can both produce the same file and Snakemake will not guess</p>
+  <dl><dt>why</dt><dd>Wildcard patterns in two rules overlap, so more than one rule could legitimately create the requested output. Snakemake refuses to pick, because picking wrong would silently produce the wrong result.</dd>
+  <dt>next</dt><dd>Make the patterns non-overlapping — usually by tightening a wildcard with a constraint (<code>wildcard_constraints</code>) or by putting each rule's output in its own directory. <code>ruleorder:</code> resolves it too, but it hides the ambiguity rather than fixing it.</dd></dl>
+  <div class="src">Snakemake documented behaviour</div>
+</article>
+<article class="entry" id="s-cyclicgraphexception">
+  <h3>CyclicGraphException</h3>
+  <p class="what">A rule ends up depending on its own output</p>
+  <dl><dt>why</dt><dd>The dependency graph must be acyclic. A cycle usually appears when a rule's input and output patterns can match the same filename, so the file is required in order to build itself.</dd>
+  <dt>next</dt><dd>Print the graph and look at where it loops: <code>snakemake --dag | dot -Tsvg > dag.svg</code>. The fix is nearly always to make the output name distinguishable from the input (a different suffix or directory) rather than to restructure the workflow.</dd></dl>
+  <div class="src">Snakemake documented behaviour</div>
+</article>
+<article class="entry" id="s-target-rules-may-not-contain-wildcards">
+  <h3>Target rules may not contain wildcards</h3>
+  <p class="what">You asked for a rule by name, but that rule only makes sense per-sample</p>
+  <dl><dt>why</dt><dd>Running <code>snakemake myrule</code> asks for a rule directly, but a rule with wildcards has no meaning without concrete values — Snakemake cannot know which sample you meant.</dd>
+  <dt>next</dt><dd>Ask for the concrete files instead (<code>snakemake results/sampleA.bam</code>), or define an <code>all</code> rule whose input lists every final file you want and run that.</dd></dl>
+  <div class="src">Snakemake documented behaviour</div>
+</article>
+<h3 class="area">conda i entorns <span>5</span></h3>
+<article class="entry" id="s-solving-environment-failed">
+  <h3>Solving environment: failed</h3>
+  <p class="what">conda cannot find a combination of versions that satisfies everything at once</p>
+  <dl><dt>why</dt><dd>Every package pins its own dependency ranges, and the more tools you stack into one environment the likelier two of them demand incompatible versions of Python, R, or a shared library. The solver is not broken — it is reporting that no valid combination exists.</dd>
+  <dt>next</dt><dd>Give each tool its own environment instead of one shared one; this single habit prevents most bioinformatics install pain. If it still fails, pin the Python version explicitly, put <code>conda-forge</code> above <code>bioconda</code> in channel priority, and retry with <code>mamba</code>, whose solver names the actual conflicting pair far more clearly.</dd></dl>
+  <div class="src">conda dependency resolution</div>
+</article>
+<article class="entry" id="s-packagesnotfounderror">
+  <h3>PackagesNotFoundError</h3>
+  <p class="what">The package exists, but not on a channel you have — or not for your platform</p>
+  <dl><dt>why</dt><dd>Two distinct causes. Either the channel is missing (most bioinformatics tools live on <code>bioconda</code>, which itself needs <code>conda-forge</code>), or <strong>the package has no build for your architecture</strong> — this is very common on Apple Silicon, where a lot of bioconda packages are <code>osx-64</code> only and simply do not exist for <code>osx-arm64</code>.</dd>
+  <dt>next</dt><dd>Add the channels in the documented order (<code>conda-forge</code>, then <code>bioconda</code>). On an Apple Silicon Mac, create the environment under emulation instead: <code>CONDA_SUBDIR=osx-64 conda create -n myenv …</code>, which pulls the Intel builds and runs them under Rosetta.</dd></dl>
+  <div class="src">conda / bioconda channel behaviour</div>
+</article>
+<article class="entry" id="s-conda-command-not-found">
+  <h3>conda: command not found</h3>
+  <p class="what">conda is installed but your shell has not been told about it</p>
+  <dl><dt>why</dt><dd>The installer adds an initialisation block to your shell profile, and that block only takes effect in a <em>new</em> shell. If you skipped the init step, or you use a shell the installer did not configure (zsh vs bash), the command is not on your PATH.</dd>
+  <dt>next</dt><dd>Run the installer's init once — <code>~/miniconda3/bin/conda init zsh</code> (or <code>bash</code>) — then open a new terminal. Editing PATH by hand also works but skips the shell functions <code>conda activate</code> needs.</dd></dl>
+  <div class="src">conda installation behaviour</div>
+</article>
+<article class="entry" id="s-condahttperror-ssl-error">
+  <h3>CondaHTTPError / SSL error</h3>
+  <p class="what">conda cannot reach the channel — network, proxy or certificate, not the package</p>
+  <dl><dt>why</dt><dd>An HTTP or SSL failure while fetching <code>repodata.json</code> means the request never got a valid answer. On institutional networks this is very often a proxy or TLS-inspecting firewall presenting its own certificate, which conda correctly refuses.</dd>
+  <dt>next</dt><dd>Test plain connectivity first (<code>curl -I https://conda.anaconda.org/bioconda/</code>). If your institution intercepts TLS, add its CA certificate to conda's trust store rather than disabling SSL verification — turning verification off makes every future install silently unverifiable.</dd></dl>
+  <div class="src">conda network behaviour</div>
+</article>
+<article class="entry" id="s-exec-format-error">
+  <h3>exec format error</h3>
+  <p class="what">The binary was built for a different CPU architecture than the machine running it</p>
+  <dl><dt>why</dt><dd>An <code>x86_64</code> binary on <code>arm64</code> (or the reverse) cannot execute. With containers this usually means the image was built for one architecture and pulled on another — a constant on Apple Silicon Macs pulling images built for Intel servers.</dd>
+  <dt>next</dt><dd>For Docker, request the right architecture explicitly: <code>docker run --platform linux/amd64 …</code>, or build a multi-arch image. For conda on Apple Silicon, create the environment with <code>CONDA_SUBDIR=osx-64</code> so it installs Intel builds that run under Rosetta.</dd></dl>
+  <div class="src">architecture mismatch, canonical</div>
+</article>
+<h3 class="area">Java <span>4</span></h3>
+<article class="entry" id="s-negativearraysizeexception">
+  <h3>NegativeArraySizeException</h3>
+  <p class="what">An integer overflowed — this is not a memory problem, and more RAM will not fix it</p>
+  <dl><dt>why</dt><dd>A negative array size means a size calculation wrapped past the 32-bit integer limit. In tools that enumerate haplotypes or combinations the count grows as <code>2^n</code>, so a single oversized unit is enough to wrap the counter negative. <strong>No amount of <code>-Xmx</code> touches this</strong> — it is an algorithmic ceiling, not a tuning one.</dd>
+  <dt>next</dt><dd>Reduce whatever made the unit too large (window size, block size, marker count), or switch to a tool that does the same computation without the 32-bit ceiling. If you saw <code>OutOfMemoryError</code> earlier in the same run, that one <em>is</em> a heap problem and is a separate fix.</dd></dl>
+  <div class="src">traced · HaploView 4.2 case, Aug 2026</div>
+</article>
+<article class="entry" id="s-xmx-set-but-ignored">
+  <h3>-Xmx set but ignored</h3>
+  <p class="what">The heap setting is being silently ignored — check the file's line endings</p>
+  <dl><dt>why</dt><dd>Java desktop tools read <code>-Xmx</code> from a <code>.vmoptions</code> file next to the executable. <strong>On Windows that file must use LF-only line endings</strong> — Notepad and most Windows editors save CRLF, the launcher fails to parse it, and falls back to the small default heap <em>with no error message at all</em>.</dd>
+  <dt>next</dt><dd>Re-save with LF endings (VS Code, or Notepad++ → Edit → EOL Conversion → Unix), or write the file on Mac/Linux and copy it over. Then confirm it applied — most tools show the current max heap under Help → About.</dd></dl>
+  <div class="src">traced · confirmed against Cytoscape&#x27;s launch docs, Sep 2026</div>
+</article>
+<article class="entry" id="s-outofmemoryerror-java-heap-space">
+  <h3>OutOfMemoryError / Java heap space</h3>
+  <p class="what">The JVM hit its heap ceiling — which is set on the JVM, not on the tool</p>
+  <dl><dt>why</dt><dd>Java tools default to a heap far smaller than the machine's RAM, so a 300 GB server still runs the tool in a couple of gigabytes unless told otherwise. Passing a memory flag to the <em>tool</em> often does nothing; the ceiling belongs to the JVM.</dd>
+  <dt>next</dt><dd>Set it on the JVM: <code>java -Xmx8g -jar tool.jar …</code>. If the tool starts from its own launcher, the flag goes in that launcher's config file — and see the <code>.vmoptions</code> entry above, which silently fails to parse on Windows when saved with CRLF endings.</dd></dl>
+  <div class="src">JVM behaviour, canonical</div>
+</article>
+<article class="entry" id="s-unsupportedclassversionerror">
+  <h3>UnsupportedClassVersionError</h3>
+  <p class="what">The tool needs a newer Java than the one running it</p>
+  <dl><dt>why</dt><dd>Java refuses to run classes compiled for a newer version than the running JVM. On shared systems an old system-wide Java usually takes precedence on PATH over whatever you installed.</dd>
+  <dt>next</dt><dd>Check what is actually being used (<code>java -version</code>, <code>which java</code>) — often not what you expect. Install the required version in your environment (conda's <code>openjdk</code> works well) and make sure it comes first on PATH inside the job, not just in your login shell.</dd></dl>
+  <div class="src">JVM class version rules</div>
+</article>
+<h3 class="area">Contenidors <span>4</span></h3>
+<article class="entry" id="s-could-not-find-artifact-in-central">
+  <h3>Could not find artifact … in central</h3>
+  <p class="what">The OSGi/Karaf container could not download its features, so its services never started</p>
+  <dl><dt>why</dt><dd>Tools built on Karaf (Cytoscape among them) resolve their feature list over the network at boot. If that fetch fails the JVM still starts and the process looks alive — but everything layered on top, <strong>including any REST/API port</strong>, never loads. That is exactly why the process shows up in <code>ps</code> while the port refuses connections.</dd>
+  <dt>next</dt><dd>First check the machine can reach the repository at all (<code>curl -I https://repo1.maven.org/maven2/</code>); inside Docker this is usually DNS or a proxy that broke without you changing anything. Then check the version in your properties/config file matches the version actually installed — a config carried over from an older image points the resolver at an artifact that does not exist.</dd></dl>
+  <div class="src">traced · CyREST-in-Docker case, Sep 2026</div>
+</article>
+<article class="entry" id="s-permission-denied-var-run-docker-sock">
+  <h3>permission denied /var/run/docker.sock</h3>
+  <p class="what">Your user is not allowed to talk to the Docker daemon</p>
+  <dl><dt>why</dt><dd>The daemon socket is owned by root and the <code>docker</code> group. A user outside that group gets permission denied for every command, including <code>docker ps</code>.</dd>
+  <dt>next</dt><dd>Add yourself to the group (<code>sudo usermod -aG docker $USER</code>) and then <strong>log out and back in</strong> — group membership is only picked up by a new session. On shared HPC systems Docker is usually not permitted at all; use Singularity/Apptainer there instead.</dd></dl>
+  <div class="src">Docker daemon permissions</div>
+</article>
+<article class="entry" id="s-no-space-left-on-device">
+  <h3>no space left on device</h3>
+  <p class="what">The disk is full — often Docker's own storage rather than your home directory</p>
+  <dl><dt>why</dt><dd>Images, stopped containers, build cache and volumes accumulate on a separate filesystem from your working files, so a full disk here can be invisible from <code>df -h ~</code>. Workflow work directories are the other usual culprit: they keep every intermediate file from every task.</dd>
+  <dt>next</dt><dd>Check where it is actually full (<code>df -h</code>, then <code>docker system df</code>). Reclaim with <code>docker system prune</code> — but read what it lists before confirming. For workflows, clean old <code>work/</code> directories once results are published; that is usually where the bulk sits.</dd></dl>
+  <div class="src">filesystem / Docker storage</div>
+</article>
+<article class="entry" id="s-tool-not-found-inside-container">
+  <h3>tool not found inside container</h3>
+  <p class="what">The tool is in the image, but the container's PATH does not include it at runtime</p>
+  <dl><dt>why</dt><dd>Software installed during the build is only on the PATH afterwards if the image sets it in its environment section. Singularity/Apptainer also inherits parts of the host environment by default, so a host PATH can shadow the container's own.</dd>
+  <dt>next</dt><dd>Confirm the tool runs directly (<code>apptainer exec image.sif bwa</code>). If that works but the workflow fails, the difference is environment, not the image: set the PATH inside the image's environment block, and run with <code>--cleanenv</code> to stop host variables leaking in.</dd></dl>
+  <div class="src">container environment handling</div>
+</article>
+<h3 class="area">Shell <span>4</span></h3>
+<article class="entry" id="s-r-command-not-found">
+  <h3>$&#x27;\\r&#x27;: command not found</h3>
+  <p class="what">The script has Windows line endings, and Linux is reading the carriage return as part of the command</p>
+  <dl><dt>why</dt><dd>A file edited or transferred from Windows ends every line with CRLF. Linux treats the trailing <code>\\r</code> as part of the last word, so <code>bash</code> becomes <code>bash\\r</code> and the interpreter line fails — and then every command inside the script fails the same way. <strong>The message often mentions a missing file, which sends people looking for the wrong thing</strong>: the file is there, its name just has an invisible character appended.</dd>
+  <dt>next</dt><dd>Convert the file: <code>dos2unix script.sh</code>, or <code>sed -i 's/\\r$//' script.sh</code>. To stop it recurring, set your editor to LF for these files and add a <code>.gitattributes</code> containing <code>*.sh text eol=lf</code>.</dd></dl>
+  <div class="src">CRLF/LF handling, canonical</div>
+</article>
+<article class="entry" id="s-argument-list-too-long">
+  <h3>Argument list too long</h3>
+  <p class="what">A glob expanded to more filenames than the shell can pass in one command</p>
+  <dl><dt>why</dt><dd>The shell expands <code>*.fastq.gz</code> into every matching filename before the program starts, and there is a hard OS limit on the total size of that argument list. It fails at a certain number of files, which is why the same command worked on a smaller dataset.</dd>
+  <dt>next</dt><dd>Feed the files instead of listing them: <code>find . -name '*.fastq.gz' | xargs -n 100 …</code>, or pass a file-of-filenames if the tool supports one. Many bioinformatics tools accept a list file precisely because of this limit.</dd></dl>
+  <div class="src">POSIX ARG_MAX limit</div>
+</article>
+<article class="entry" id="s-too-many-open-files">
+  <h3>Too many open files</h3>
+  <p class="what">The process hit the per-process limit on simultaneously open file handles</p>
+  <dl><dt>why</dt><dd>Tools that merge or demultiplex hold many files open at once — one per sample, per chromosome, per barcode. The default limit (often 1024) is reached quickly with a few hundred samples.</dd>
+  <dt>next</dt><dd>Raise the soft limit for the session (<code>ulimit -n 4096</code>) or ask your admin to raise the hard limit. Better where the tool supports it: merge in batches so it never needs that many handles at once.</dd></dl>
+  <div class="src">POSIX file descriptor limits</div>
+</article>
+<article class="entry" id="s-permission-denied-running-a-script">
+  <h3>Permission denied (running a script)</h3>
+  <p class="what">The file is not marked executable, or you are writing where you may not</p>
+  <dl><dt>why</dt><dd>A downloaded or freshly written script has no execute bit, so running it directly fails even though the contents are fine. The same message also appears when a tool tries to write into a directory you do not own — read-only reference directories are the classic case.</dd>
+  <dt>next</dt><dd>For a script: <code>chmod +x script.sh</code>, or run it as <code>bash script.sh</code>. If it is a write failure, point the tool's output somewhere you own — many tools default to writing next to their input, which fails on shared reference data.</dd></dl>
+  <div class="src">POSIX permissions</div>
+</article>
+<h3 class="area">HPC i cues <span>3</span></h3>
+<article class="entry" id="s-oom-kill-exceeded-memory-limit">
+  <h3>oom-kill / exceeded memory limit</h3>
+  <p class="what">The scheduler killed the job for exceeding the memory it requested</p>
+  <dl><dt>why</dt><dd>On a cluster you get exactly the memory you asked for, not what the node has. Going over gets the job killed immediately — the tool's own output stops mid-sentence and explains nothing, because it was never told.</dd>
+  <dt>next</dt><dd>Ask for more for that specific step, then measure rather than guess: <code>seff &lt;jobid&gt;</code> (Slurm) reports what the job actually used, which is how you set the next request. In a workflow, raise the memory directive for that one process rather than the whole run.</dd></dl>
+  <div class="src">Slurm / scheduler behaviour</div>
+</article>
+<article class="entry" id="s-due-to-time-limit">
+  <h3>DUE TO TIME LIMIT</h3>
+  <p class="what">The job hit its wall-clock limit and was cancelled mid-run</p>
+  <dl><dt>why</dt><dd>The scheduler enforces the requested time, not the time the work needs. Partial output left behind is the dangerous part — it can look like a finished result to the next step in a pipeline.</dd>
+  <dt>next</dt><dd>Delete the partial outputs before rerunning, then request a realistic time based on a completed smaller run. If a step genuinely takes days, split it (per chromosome, per sample) so a failure costs one shard rather than the whole run.</dd></dl>
+  <div class="src">Slurm / scheduler behaviour</div>
+</article>
+<article class="entry" id="s-exit-status-137-oomkilled">
+  <h3>exit status 137 / OOMKilled</h3>
+  <p class="what">The process was killed from outside for using too much memory</p>
+  <dl><dt>why</dt><dd>137 is 128 + 9, meaning SIGKILL. In practice that is nearly always the kernel's OOM killer or a container/scheduler memory limit — <strong>not a bug in your data or command</strong>. The tool's own output explains nothing because it was never given the chance.</dd>
+  <dt>next</dt><dd>Raise the memory for that specific step rather than the whole run: the <code>memory</code> directive for that Nextflow process, <code>resources: mem_mb</code> in Snakemake, <code>--memory</code> for Docker, or your scheduler's request. If it dies at the same input regardless of the limit, look at what is unusual about that input.</dd></dl>
+  <div class="src">POSIX signal behaviour, canonical</div>
+</article>
+<h3 class="area">R i Bioconductor <span>2</span></h3>
+<article class="entry" id="s-there-is-no-package-called-x">
+  <h3>there is no package called &#x27;X&#x27;</h3>
+  <p class="what">The package is installed somewhere, but not in the library this R session uses</p>
+  <dl><dt>why</dt><dd>R keeps separate libraries per version and per install, so a package installed under R 4.3 is invisible to R 4.4, and one installed in a conda environment is invisible outside it. In a workflow, the R that runs the task is often not the R you tested in.</dd>
+  <dt>next</dt><dd>Ask the running session where it is looking: <code>.libPaths()</code> and <code>sessionInfo()</code>, printed from inside the failing script rather than from your console. Install into that library, and keep Bioconductor packages installed through <code>BiocManager</code> so their versions stay matched to your R version.</dd></dl>
+  <div class="src">R library path behaviour</div>
+</article>
+<article class="entry" id="s-cannot-allocate-vector-of-size">
+  <h3>cannot allocate vector of size</h3>
+  <p class="what">R asked the OS for one contiguous block it could not get</p>
+  <dl><dt>why</dt><dd>R needs a single contiguous allocation for a vector or matrix, so this can fail while plenty of RAM appears free. Copy-on-modify makes it worse: an innocuous-looking operation on a large object can transiently need twice its size.</dd>
+  <dt>next</dt><dd>Work on a subset first to confirm the logic, then reduce peak memory rather than just asking for more: drop objects you no longer need with <code>rm()</code> plus <code>gc()</code>, avoid growing objects in loops, and use sparse or on-disk representations (<code>Matrix</code>, <code>DelayedArray</code>, HDF5) for single-cell-scale data.</dd></dl>
+  <div class="src">R memory model</div>
+</article>
+<h3 class="area">Net <span>1</span></h3>
+<article class="entry" id="s-connection-refused-http-522">
+  <h3>connection refused / HTTP 522</h3>
+  <p class="what">Nothing is listening — this is a server or startup problem, not your install</p>
+  <dl><dt>why</dt><dd><code>Connection refused</code> means nothing is bound to that port; <strong>HTTP 522 is Cloudflare reporting that the origin server did not answer</strong>. Either way the failure is on the far side. Reinstalling the client, switching networks or disabling your firewall cannot fix a service that is down or never finished starting.</dd>
+  <dt>next</dt><dd>For a public service, check its status page before touching anything locally. For your own process, it started but its service layer never came up — read the startup log <strong>from the beginning</strong> and find the first failure, not the last line.</dd></dl>
+  <div class="src">traced · STRING-DB outage + CyREST startup, 2026</div>
+</article>
+<h3 class="area">Align <span>1</span></h3>
+<article class="entry" id="s-fail-to-locate-the-index-files">
+  <h3>fail to locate the index files</h3>
+  <p class="what">The aligner was given a reference that has no index beside it</p>
+  <dl><dt>why</dt><dd>Aligners take the <em>prefix</em> of an index and expect the generated index files to sit in the same directory under that same prefix. If the index was built elsewhere, only some files were staged, or the prefix does not match what was indexed, the aligner cannot assemble the set — and typically dumps its whole usage text, which makes it look like a syntax error instead.</dd>
+  <dt>next</dt><dd>List the directory and confirm the full index set is next to the reference, all sharing one prefix. In a workflow, check what the indexing step actually staged into the task's working directory: the file passed to the aligner and the file that was indexed must be the same prefix.</dd></dl>
+  <div class="src">traced · AMR++ / bwa case, Sep 2026</div>
+</article>
+<h3 class="area">Python <span>1</span></h3>
+<article class="entry" id="s-modulenotfounderror-after-installing">
+  <h3>ModuleNotFoundError after installing</h3>
+  <p class="what">pip installed into a different Python than the one running the script</p>
+  <dl><dt>why</dt><dd>A system can easily have several Pythons — system, conda, venv, plus whatever the workflow or notebook uses. <code>pip install X</code> installs into whichever pip is first on PATH, which is often not the interpreter that then runs your code.</dd>
+  <dt>next</dt><dd>Tie them together: <code>python -m pip install X</code> uses the same interpreter you are running. To confirm, print <code>sys.executable</code> from inside the failing script — that is the Python that matters, and it is frequently a surprise.</dd></dl>
+  <div class="src">Python environment behaviour</div>
+</article>
+</section>
+<!-- CATALEG-ESTATIC:FI -->
 
   <footer>
     Built by Biel Porté. Entries marked <em>traced</em> came from a real question
