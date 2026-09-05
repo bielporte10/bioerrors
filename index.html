@@ -96,6 +96,10 @@
   .catalogue{display:flex;flex-wrap:wrap;gap:7px;}
   .cat-item{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-muted);background:var(--surface);border:1px solid var(--line);padding:4px 9px;border-radius:6px;}
 
+  .nomatch a.report{display:inline-block;margin-top:2px;font-weight:600;color:var(--ink);
+    border:1px solid var(--ink);border-radius:4px;padding:6px 12px;text-decoration:none;}
+  .nomatch a.report:hover{background:var(--ink);color:#fff;}
+  .reportnote{display:block;margin-top:8px;font-size:12px;color:var(--ink-faint);}
   footer{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-faint);border-top:1px solid var(--line);padding-top:18px;line-height:1.7;}
 </style>
 
@@ -146,7 +150,11 @@
     Built by Biel Porté. Entries marked <em>traced</em> came from a real question
     from a real person, followed to the source before anything was written down;
     the rest are documented behaviour of the tool itself.<br>
-    Hit an error it doesn't know? That's the useful case — send it over and it gets traced and added.
+    Hit an error it doesn't know? That's the useful case — paste it above and use the
+    <em>Send this error</em> button.<br>
+    No AI, no tracking, no account, no server: the whole catalogue is in this page's source.
+    Read it or check an entry at
+    <a href="https://github.com/bielporte10/bioerrors">github.com/bielporte10/bioerrors</a>.
   </footer>
 
 </div>
@@ -557,6 +565,23 @@
     '</div>';
   }
 
+  // El catàleg no té servidor, o sigui que quan no reconeix un error no se
+  // n'assabenta ningú. Sense això, la frase "send it over" no porta enlloc i el
+  // bucle de validació —cada error desconegut diu quina fitxa toca escriure—
+  // queda trencat justament al punt on havia de tancar-se. Una issue de GitHub
+  // ja emplenada ho resol sense servidor, sense compte propi i sense cost.
+  function issueUrl(text){
+    var NL = String.fromCharCode(10);
+    var fence = '```';
+    var body = 'What I ran:' + NL + NL + NL +
+      'The error:' + NL + NL + fence + NL + text.slice(0, 1500) +
+      (text.length > 1500 ? NL + '[...trimmed]' : '') + NL + fence + NL + NL +
+      'Tool and version (if known):' + NL;
+    return 'https://github.com/bielporte10/bioerrors/issues/new' +
+      '?labels=unmatched&title=' + encodeURIComponent('Unmatched error') +
+      '&body=' + encodeURIComponent(body);
+  }
+
   function render(text){
     var found = CATALOGUE.filter(function(e){ return e.sig.test(text); });
     if (!found.length){
@@ -564,7 +589,10 @@
         '<div class="nomatch"><b>Not in the catalogue yet.</b> Rather than guess, this says plainly ' +
         'that it has not been traced — every entry here was confirmed against the tool’s own source, ' +
         'documentation or log before it was written down.<br><br>' +
-        'Send this error over and it gets traced properly and added. That is how the entries above got here.</div>';
+        'Send it over and it gets traced properly and added. That is how the entries above got here.' +
+        '<br><br><a class="report" target="_blank" rel="noopener" href="' + issueUrl(text) + '">' +
+        'Send this error &rarr;</a> <span class="reportnote">Opens a pre-filled GitHub issue. ' +
+        'Nothing is sent from this page — it has no server.</span></div>';
       statusLine.textContent = 'no match — ' + CATALOGUE.length + ' signatures checked';
       return;
     }
